@@ -98,22 +98,33 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         }, 3000);
     }
 
-    openPreview(document: vscode.TextDocument, toSide: boolean): void {
+    async openPreview(document: vscode.TextDocument, _toSide: boolean = false): Promise<void> {
         const key = document.fileName;
         const existing = this.panels.get(key);
 
+        // Determine the column where the source editor currently sits — open
+        // the preview there and close the source tab so they don't both show
+        const sourceTab = vscode.window.tabGroups.all
+            .flatMap(g => g.tabs)
+            .find(t => t.input instanceof vscode.TabInputText
+                && t.input.uri.toString() === document.uri.toString());
+        const targetColumn = sourceTab?.group.viewColumn ?? vscode.ViewColumn.Active;
+
         if (existing) {
-            existing.panel.reveal(toSide ? vscode.ViewColumn.Two : vscode.ViewColumn.One);
+            existing.panel.reveal(targetColumn);
             existing.initialized = false;
             existing.document = document;
             this.updateContent(document);
+            if (sourceTab) {
+                try { await vscode.window.tabGroups.close(sourceTab); } catch { /* ignore */ }
+            }
             return;
         }
 
         const panel = vscode.window.createWebviewPanel(
             'markdown-x-preview',
             `Preview: ${path.basename(document.fileName)}`,
-            toSide ? vscode.ViewColumn.Two : vscode.ViewColumn.One,
+            targetColumn,
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,
@@ -124,6 +135,11 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
                 ]
             }
         );
+
+        // Close the source editor tab — user wants only one of them visible
+        if (sourceTab) {
+            try { await vscode.window.tabGroups.close(sourceTab); } catch { /* ignore */ }
+        }
 
         const ps: PanelState = {
             panel,
@@ -140,6 +156,26 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             const s = this.panels.get(key);
             if (s) s.scrollSyncEnabled = true;
         }, 2000);
+    }
+
+    /** Open the source editor and close the preview panel. Used by toolbar/command. */
+    async showSource(): Promise<void> {
+        // Pick the focused panel, otherwise the most recent
+        let target: PanelState | undefined;
+        for (const ps of this.panels.values()) {
+            if (ps.previewFocused) { target = ps; break; }
+        }
+        if (!target) {
+            const last = Array.from(this.panels.values()).pop();
+            target = last;
+        }
+        if (!target) return;
+
+        const column = target.panel.viewColumn ?? vscode.ViewColumn.Active;
+        const doc = target.document;
+        // Open the source in the preview's column, then dispose the panel
+        await vscode.window.showTextDocument(doc, { viewColumn: column, preserveFocus: false });
+        target.panel.dispose();
     }
 
     private setupWebview(key: string): void {
@@ -314,19 +350,31 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         );
     }
 
-    updateContent(document: vscode.TextDocument): void {
+    async updateContent(document: vscode.TextDocument): Promise<void> {
         const ps = this.panels.get(document.fileName);
         if (!ps) return;
+
+        ps.document = document;
+        ps.panel.title = `Preview: ${path.basename(document.fileName)}`;
 
         if (!ps.initialized) {
             const html = this.generateHtml(ps, document.getText(), document.fileName);
             ps.panel.webview.html = html;
             ps.initialized = true;
-        } else {
-            const htmlContent = this.renderMarkdown(ps.panel.webview, document.getText(), document.fileName);
-            ps.panel.webview.postMessage({ type: 'updateContent', html: htmlContent });
+            return;
         }
-        ps.panel.title = `Preview: ${path.basename(document.fileName)}`;
+
+        // Try incremental update via postMessage; if it fails (webview not
+        // ready or message dropped), fall back to a full re-render so the
+        // preview never goes stale
+        const htmlContent = this.renderMarkdown(ps.panel.webview, document.getText(), document.fileName);
+        const delivered = await ps.panel.webview.postMessage({ type: 'updateContent', html: htmlContent });
+        if (!delivered) {
+            ps.initialized = false;
+            const html = this.generateHtml(ps, document.getText(), document.fileName);
+            ps.panel.webview.html = html;
+            ps.initialized = true;
+        }
     }
 
     updateTheme(theme: string): void {

@@ -49,6 +49,40 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Show Source — close preview, open source editor in same column
+    context.subscriptions.push(
+        vscode.commands.registerCommand('markdown-x.showSource', () => {
+            previewProvider.showSource();
+        })
+    );
+
+    // Copy Path — copy absolute path of the current preview's document
+    context.subscriptions.push(
+        vscode.commands.registerCommand('markdown-x.copyPath', async () => {
+            const doc = previewProvider.getCurrentDocument();
+            if (!doc) {
+                vscode.window.showWarningMessage('Markdown X: No active preview');
+                return;
+            }
+            await vscode.env.clipboard.writeText(doc.fileName);
+            vscode.window.setStatusBarMessage(`Copied path: ${doc.fileName}`, 2500);
+        })
+    );
+
+    // Copy Relative Path — workspace-relative path of preview's document
+    context.subscriptions.push(
+        vscode.commands.registerCommand('markdown-x.copyRelativePath', async () => {
+            const doc = previewProvider.getCurrentDocument();
+            if (!doc) {
+                vscode.window.showWarningMessage('Markdown X: No active preview');
+                return;
+            }
+            const rel = vscode.workspace.asRelativePath(doc.uri, false);
+            await vscode.env.clipboard.writeText(rel);
+            vscode.window.setStatusBarMessage(`Copied path: ${rel}`, 2500);
+        })
+    );
+
     // Configure Keyboard Shortcuts — open Keyboard Shortcuts UI filtered to markdown-x
     context.subscriptions.push(
         vscode.commands.registerCommand('markdown-x.configureKeybindings', () => {

@@ -2,7 +2,7 @@
   "name": "markdown-x",
   "displayName": "Markdown X",
   "description": "Ultimate Markdown Viewer with PDF/Word export, page-aware layout, Mermaid diagrams, KaTeX math, and custom themes",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "publisher": "xieum-cloud",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -152,6 +152,23 @@
         "title": "%markdown-x.commands.configureKeybindings%",
         "category": "Markdown X",
         "icon": "$(keyboard)"
+      },
+      {
+        "command": "markdown-x.showSource",
+        "title": "%markdown-x.commands.showSource%",
+        "category": "Markdown X",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "markdown-x.copyPath",
+        "title": "%markdown-x.commands.copyPath%",
+        "category": "Markdown X",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "markdown-x.copyRelativePath",
+        "title": "%markdown-x.commands.copyRelativePath%",
+        "category": "Markdown X"
       }
     ],
     "menus": {
@@ -160,6 +177,11 @@
           "command": "markdown-x.openPreview",
           "group": "navigation",
           "when": "editorLangId == markdown"
+        },
+        {
+          "command": "markdown-x.showSource",
+          "group": "navigation@0",
+          "when": "activeWebviewPanelId == markdown-x-preview"
         },
         {
           "command": "markdown-x.togglePagePreview",
@@ -207,8 +229,13 @@
           "when": "editorLangId == markdown || activeWebviewPanelId == markdown-x-preview"
         },
         {
-          "command": "markdown-x.configureKeybindings",
+          "command": "markdown-x.copyPath",
           "group": "1_mx@7",
+          "when": "activeWebviewPanelId == markdown-x-preview"
+        },
+        {
+          "command": "markdown-x.configureKeybindings",
+          "group": "1_mx@8",
           "when": "editorLangId == markdown || activeWebviewPanelId == markdown-x-preview"
         }
       ],
@@ -217,6 +244,18 @@
           "command": "markdown-x.openPreview",
           "group": "markdown-x@1",
           "when": "editorLangId == markdown"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "markdown-x.copyPath",
+          "group": "1_close@1",
+          "when": "activeWebviewPanelId == markdown-x-preview"
+        },
+        {
+          "command": "markdown-x.copyRelativePath",
+          "group": "1_close@2",
+          "when": "activeWebviewPanelId == markdown-x-preview"
         }
       ],
       "explorer/context": [
@@ -270,6 +309,18 @@
         {
           "command": "markdown-x.configureKeybindings",
           "when": "true"
+        },
+        {
+          "command": "markdown-x.showSource",
+          "when": "markdown-x:previewOpen"
+        },
+        {
+          "command": "markdown-x.copyPath",
+          "when": "markdown-x:previewOpen"
+        },
+        {
+          "command": "markdown-x.copyRelativePath",
+          "when": "markdown-x:previewOpen"
         }
       ]
     },

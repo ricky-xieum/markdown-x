@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 (2026-05-03)
+
+- Single-panel toggle: opening preview closes the source editor; "Show Source" button in preview reopens the source and closes preview
+- Auto-refresh fallback: if webview is not ready and an incremental message is dropped, fall back to a full re-render so preview never goes stale
+
 ## 0.1.8 (2026-04-24)
 
 - Reliable auto-refresh: mermaid diagrams update correctly when source is edited, added, removed, or reordered (was previously index-based and could misalign)
