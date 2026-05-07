@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10 (2026-05-06)
+
+- Add Cmd/Ctrl+Shift+V keybinding for "Show Source" in preview, so the same shortcut now toggles between editor and preview
+
 ## 0.1.9 (2026-05-03)
 
 - Single-panel toggle: opening preview closes the source editor; "Show Source" button in preview reopens the source and closes preview
