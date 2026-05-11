@@ -639,6 +639,44 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         }
         hr { border: none; border-top: 1px solid var(--border-color); margin: 2em 0; }
 
+        /* Collapsible details / admonitions (from ??? syntax) */
+        details {
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--link-color);
+            border-radius: 6px;
+            padding: 0.5em 1em;
+            margin: 1em 0;
+            background-color: var(--blockquote-bg);
+        }
+        details > summary {
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.2em 0;
+            user-select: none;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 0.4em;
+        }
+        details > summary::-webkit-details-marker { display: none; }
+        details > summary::before {
+            content: '▶';
+            font-size: 0.8em;
+            transition: transform 0.15s;
+            display: inline-block;
+        }
+        details[open] > summary::before { transform: rotate(90deg); }
+        details > summary + * { margin-top: 0.6em; }
+        details > *:last-child { margin-bottom: 0; }
+
+        /* Admonition type accents */
+        details.admonition-note     { border-left-color: #0969da; }
+        details.admonition-info     { border-left-color: #1f6feb; }
+        details.admonition-tip      { border-left-color: #1a7f37; }
+        details.admonition-warning  { border-left-color: #bf8700; }
+        details.admonition-danger,
+        details.admonition-error    { border-left-color: #cf222e; }
+
         .container { position: relative; }
 
         .task-list-item { list-style-type: none; }

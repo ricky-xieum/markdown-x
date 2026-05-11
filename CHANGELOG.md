@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11 (2026-05-11)
+
+- Collapsible admonitions: support MkDocs-style `???` (collapsed) and `???+` (open) syntax with optional type and title
+- Type-based accent colors for note / info / tip / warning / danger
+- Allow raw `<details>` / `<summary>` HTML through the parser; other raw HTML is still escaped
+
 ## 0.1.10 (2026-05-06)
 
 - Add Cmd/Ctrl+Shift+V keybinding for "Show Source" in preview, so the same shortcut now toggles between editor and preview

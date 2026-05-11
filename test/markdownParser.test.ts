@@ -76,6 +76,52 @@ test('renders mermaid blocks as div.mermaid', () => {
     assert.ok(!html.includes('<pre>'));
 });
 
+test('renders ??? admonition as collapsed <details>', () => {
+    const html = parseMarkdown('??? note "테이블 명단"\n    - item1\n    - item2');
+    assert.ok(html.includes('<details'));
+    assert.ok(!html.includes('<details open'));
+    assert.ok(html.includes('admonition-note'));
+    assert.ok(html.includes('<summary>테이블 명단</summary>'));
+    assert.ok(html.includes('<li>item1</li>'));
+    assert.ok(html.includes('</details>'));
+});
+
+test('renders ???+ admonition as open <details>', () => {
+    const html = parseMarkdown('???+ tip "팁"\n    내용');
+    assert.ok(html.includes('<details open'));
+    assert.ok(html.includes('admonition-tip'));
+});
+
+test('admonition body supports nested markdown', () => {
+    const html = parseMarkdown('??? note "T"\n    **bold** and `code`');
+    assert.ok(html.includes('<strong>bold</strong>'));
+    assert.ok(html.includes('<code>code</code>'));
+});
+
+test('admonition without title uses type as summary', () => {
+    const html = parseMarkdown('??? warning\n    조심');
+    assert.ok(html.includes('<summary>Warning</summary>'));
+});
+
+test('??? inside code block is not transformed', () => {
+    const html = parseMarkdown('```\n??? note "ignored"\n    body\n```');
+    assert.ok(!html.includes('<details'));
+    assert.ok(html.includes('??? note'));
+});
+
+test('plain <details> HTML is allowed through', () => {
+    const html = parseMarkdown('<details>\n<summary>Title</summary>\n\n- item\n\n</details>');
+    assert.ok(html.includes('<details>'));
+    assert.ok(html.includes('<summary>Title</summary>'));
+    assert.ok(html.includes('<li>item</li>'));
+});
+
+test('non-allowed raw HTML is still escaped', () => {
+    const html = parseMarkdown('<script>alert(1)</script>');
+    assert.ok(html.includes('&lt;script&gt;'));
+    assert.ok(!html.includes('<script>'));
+});
+
 test('renders inline code', () => {
     const html = parseMarkdown('Use `npm install` to install');
     assert.ok(html.includes('<code>npm install</code>'));
