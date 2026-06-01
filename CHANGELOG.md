@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.12 (2026-06-01)
+
+Performance:
+
+- Bundle Mermaid and KaTeX locally under `media/vendor/` instead of loading from jsDelivr on every render. Eliminates the per-preview network round-trip and lets the preview work fully offline.
+- Slim `highlight.js` to ~30 commonly-used languages via `lib/core` (was the full ~190-language bundle). Trims ~700 KB from the extension bundle.
+
+Preview behavior (XM-1):
+
+- New `markdown-x.autoPreviewOnly` setting (boolean, default `false`). When enabled, opening a markdown file opens the preview only — the source editor is closed. Source can be reopened via the "Show Source" button or `Cmd/Ctrl+Shift+V`.
+- Manual `Cmd/Ctrl+Shift+V` from a markdown editor now always opens the preview side-by-side (no more closing the source).
+- `Cmd/Ctrl+Shift+V` from inside a preview opens the source side-by-side; preview stays open.
+- "Show Source" toolbar button no longer disposes the preview — it brings the source editor up beside it.
+- Auto-preview-only triggers only on file open (not on tab switches), so manually opening the source via Show Source / shortcut is respected for the rest of the session.
+
 ## 0.1.11 (2026-05-11)
 
 - Collapsible admonitions: support MkDocs-style `???` (collapsed) and `???+` (open) syntax with optional type and title

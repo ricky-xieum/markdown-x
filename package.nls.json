@@ -26,6 +26,7 @@
   "markdown-x.configuration.enableMermaid": "Enable Mermaid diagram rendering",
   "markdown-x.configuration.enableImageLightbox": "Enable image lightbox on click",
   "markdown-x.configuration.enableScrollSync": "Enable scroll synchronization between editor and preview",
+  "markdown-x.configuration.autoPreviewOnly": "Automatically open preview only (no source editor) when a markdown file is opened. The source editor can still be reached via the toolbar \"Show Source\" button or Cmd/Ctrl+Shift+V.",
   "markdown-x.configuration.maxTocLevel": "Maximum heading level to show in TOC",
   "markdown-x.configuration.fontFamily": "Body font family",
   "markdown-x.configuration.codeFontFamily": "Code block font family",

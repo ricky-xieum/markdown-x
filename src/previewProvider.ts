@@ -98,12 +98,66 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         }, 3000);
     }
 
-    async openPreview(document: vscode.TextDocument, _toSide: boolean = false): Promise<void> {
+    /**
+     * Open (or focus) a preview side-by-side with the source editor.
+     * Never closes the source — both can be visible at once.
+     */
+    async openPreview(document: vscode.TextDocument): Promise<void> {
         const key = document.fileName;
         const existing = this.panels.get(key);
 
-        // Determine the column where the source editor currently sits — open
-        // the preview there and close the source tab so they don't both show
+        // Beside the active editor (VS Code chooses or creates the next column)
+        const targetColumn = vscode.ViewColumn.Beside;
+
+        if (existing) {
+            existing.panel.reveal(undefined, /*preserveFocus*/ true);
+            existing.initialized = false;
+            existing.document = document;
+            this.updateContent(document);
+            return;
+        }
+
+        const panel = vscode.window.createWebviewPanel(
+            'markdown-x-preview',
+            `Preview: ${path.basename(document.fileName)}`,
+            { viewColumn: targetColumn, preserveFocus: true },
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [
+                    this.extensionUri,
+                    vscode.Uri.file(path.dirname(document.fileName)),
+                    ...(vscode.workspace.workspaceFolders?.map(f => f.uri) || [])
+                ]
+            }
+        );
+
+        const ps: PanelState = {
+            panel,
+            document,
+            initialized: false,
+            scrollSyncEnabled: false,
+            previewFocused: false,
+        };
+        this.panels.set(key, ps);
+        this.setupWebview(key);
+        this.updateContent(document);
+        vscode.commands.executeCommand('setContext', 'markdown-x:previewOpen', true);
+        setTimeout(() => {
+            const s = this.panels.get(key);
+            if (s) s.scrollSyncEnabled = true;
+        }, 2000);
+    }
+
+    /**
+     * Open a preview without the source editor visible. Closes the source
+     * tab if one is currently open. Used by autoPreviewOnly mode.
+     */
+    async openPreviewOnly(document: vscode.TextDocument): Promise<void> {
+        const key = document.fileName;
+        const existing = this.panels.get(key);
+
+        // The source tab (if any) we'll close so only preview is visible
         const sourceTab = vscode.window.tabGroups.all
             .flatMap(g => g.tabs)
             .find(t => t.input instanceof vscode.TabInputText
@@ -136,7 +190,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             }
         );
 
-        // Close the source editor tab — user wants only one of them visible
         if (sourceTab) {
             try { await vscode.window.tabGroups.close(sourceTab); } catch { /* ignore */ }
         }
@@ -158,7 +211,11 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         }, 2000);
     }
 
-    /** Open the source editor and close the preview panel. Used by toolbar/command. */
+    /**
+     * Open (or focus) the source editor side-by-side. Does NOT dispose the
+     * preview panel — both stay visible. Invoked from the "Show Source"
+     * toolbar button and from Cmd+Shift+V inside a preview.
+     */
     async showSource(): Promise<void> {
         // Pick the focused panel, otherwise the most recent
         let target: PanelState | undefined;
@@ -171,11 +228,24 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         }
         if (!target) return;
 
-        const column = target.panel.viewColumn ?? vscode.ViewColumn.Active;
         const doc = target.document;
-        // Open the source in the preview's column, then dispose the panel
-        await vscode.window.showTextDocument(doc, { viewColumn: column, preserveFocus: false });
-        target.panel.dispose();
+        // Reveal the source in the active group, or beside the preview
+        const sourceTab = vscode.window.tabGroups.all
+            .flatMap(g => g.tabs)
+            .find(t => t.input instanceof vscode.TabInputText
+                && t.input.uri.toString() === doc.uri.toString());
+        if (sourceTab) {
+            // Already open — just focus the group it's in
+            await vscode.window.showTextDocument(doc, {
+                viewColumn: sourceTab.group.viewColumn,
+                preserveFocus: false
+            });
+        } else {
+            await vscode.window.showTextDocument(doc, {
+                viewColumn: vscode.ViewColumn.Beside,
+                preserveFocus: false
+            });
+        }
     }
 
     private setupWebview(key: string): void {
@@ -479,21 +549,27 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         const webview = ps.panel.webview;
         const cspSource = webview.cspSource;
 
+        // Local vendor URIs (Mermaid, KaTeX) — bundled into media/vendor at
+        // build time, so no CDN round-trip on every preview render
+        const vendorUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this.extensionUri, 'media', 'vendor')
+        );
+
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'nonce-${nonce}' https://cdn.jsdelivr.net 'unsafe-eval'; img-src ${cspSource} https: data:; font-src https://cdn.jsdelivr.net;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${cspSource} 'unsafe-eval'; img-src ${cspSource} https: data:; font-src ${cspSource};">
     <title>Markdown X Preview</title>
 
-    <!-- KaTeX for math -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script defer nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script defer nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <!-- KaTeX for math (local) -->
+    <link rel="stylesheet" href="${vendorUri}/katex.min.css">
+    <script defer nonce="${nonce}" src="${vendorUri}/katex.min.js"></script>
+    <script defer nonce="${nonce}" src="${vendorUri}/auto-render.min.js"></script>
 
-    ${enableMermaid ? `<!-- Mermaid for diagrams -->
-    <script nonce="${nonce}" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>` : ''}
+    ${enableMermaid ? `<!-- Mermaid for diagrams (local) -->
+    <script nonce="${nonce}" src="${vendorUri}/mermaid.min.js"></script>` : ''}
 
     <style>
         :root {

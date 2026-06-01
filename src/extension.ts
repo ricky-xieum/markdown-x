@@ -30,10 +30,10 @@ export function activate(context: vscode.ExtensionContext) {
             // Explorer context menu passes a URI argument
             if (uri) {
                 const doc = await vscode.workspace.openTextDocument(uri);
-                previewProvider.openPreview(doc, true);
+                previewProvider.openPreview(doc);
                 return;
             }
-            // Editor or command palette
+            // Editor or command palette — manual invocation uses toggle behavior
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showWarningMessage('Markdown X: No active editor found');
@@ -45,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
                 );
                 return;
             }
-            previewProvider.openPreview(editor.document, true);
+            previewProvider.openPreview(editor.document);
         })
     );
 
@@ -337,6 +337,31 @@ export function activate(context: vscode.ExtensionContext) {
             }, 200));
         })
     );
+
+    // Auto-preview-only on file open. When enabled, opening a markdown file
+    // replaces the source editor with a preview. Controlled by
+    // markdown-x.autoPreviewOnly (default: false).
+    //
+    // We only fire on onDidOpenTextDocument (initial load), not on tab
+    // switches, so that once the user manually opens the source via
+    // Show Source / Cmd+Shift+V the source view stays put.
+    const triggerAutoPreviewOnly = (doc: vscode.TextDocument | undefined) => {
+        if (!doc || doc.languageId !== 'markdown') return;
+        const enabled = vscode.workspace.getConfiguration('markdown-x')
+            .get<boolean>('autoPreviewOnly', false);
+        if (!enabled) return;
+        if (previewProvider.hasPanel(doc.fileName)) return;
+        previewProvider.openPreviewOnly(doc);
+    };
+
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument(doc => triggerAutoPreviewOnly(doc))
+    );
+
+    // Handle file already open at activation time
+    if (vscode.window.activeTextEditor) {
+        triggerAutoPreviewOnly(vscode.window.activeTextEditor.document);
+    }
 }
 
 export function deactivate() {

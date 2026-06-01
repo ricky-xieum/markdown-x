@@ -26,6 +26,7 @@
   "markdown-x.configuration.enableMermaid": "Mermaid 다이어그램 렌더링 활성화",
   "markdown-x.configuration.enableImageLightbox": "이미지 라이트박스 활성화",
   "markdown-x.configuration.enableScrollSync": "편집기와 미리보기 간 스크롤 동기화 활성화",
+  "markdown-x.configuration.autoPreviewOnly": "마크다운 파일을 열 때 미리보기만 자동으로 표시 (소스 에디터는 닫힘). 소스가 필요하면 툴바의 \"원본 보기\" 버튼이나 Cmd/Ctrl+Shift+V로 열기 가능.",
   "markdown-x.configuration.maxTocLevel": "목차에 표시할 최대 헤딩 레벨",
   "markdown-x.configuration.fontFamily": "본문 글꼴",
   "markdown-x.configuration.codeFontFamily": "코드 블록 글꼴",

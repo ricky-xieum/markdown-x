@@ -1,5 +1,63 @@
 import { marked, Renderer } from 'marked';
-import hljs from 'highlight.js';
+import hljs from 'highlight.js/lib/core';
+import type { LanguageFn } from 'highlight.js';
+
+// Register only commonly-used languages instead of the full ~190-language
+// bundle. This trims ~3 MB from out/extension.js. Users who need a missing
+// language can ask us to add it; auto-detection is disabled regardless.
+const languages: Array<[string, () => LanguageFn]> = [
+    ['bash', () => require('highlight.js/lib/languages/bash')],
+    ['shell', () => require('highlight.js/lib/languages/shell')],
+    ['c', () => require('highlight.js/lib/languages/c')],
+    ['cpp', () => require('highlight.js/lib/languages/cpp')],
+    ['csharp', () => require('highlight.js/lib/languages/csharp')],
+    ['css', () => require('highlight.js/lib/languages/css')],
+    ['scss', () => require('highlight.js/lib/languages/scss')],
+    ['less', () => require('highlight.js/lib/languages/less')],
+    ['diff', () => require('highlight.js/lib/languages/diff')],
+    ['dockerfile', () => require('highlight.js/lib/languages/dockerfile')],
+    ['go', () => require('highlight.js/lib/languages/go')],
+    ['html', () => require('highlight.js/lib/languages/xml')],
+    ['xml', () => require('highlight.js/lib/languages/xml')],
+    ['ini', () => require('highlight.js/lib/languages/ini')],
+    ['java', () => require('highlight.js/lib/languages/java')],
+    ['javascript', () => require('highlight.js/lib/languages/javascript')],
+    ['json', () => require('highlight.js/lib/languages/json')],
+    ['kotlin', () => require('highlight.js/lib/languages/kotlin')],
+    ['makefile', () => require('highlight.js/lib/languages/makefile')],
+    ['markdown', () => require('highlight.js/lib/languages/markdown')],
+    ['nginx', () => require('highlight.js/lib/languages/nginx')],
+    ['perl', () => require('highlight.js/lib/languages/perl')],
+    ['php', () => require('highlight.js/lib/languages/php')],
+    ['plaintext', () => require('highlight.js/lib/languages/plaintext')],
+    ['powershell', () => require('highlight.js/lib/languages/powershell')],
+    ['python', () => require('highlight.js/lib/languages/python')],
+    ['ruby', () => require('highlight.js/lib/languages/ruby')],
+    ['rust', () => require('highlight.js/lib/languages/rust')],
+    ['scala', () => require('highlight.js/lib/languages/scala')],
+    ['sql', () => require('highlight.js/lib/languages/sql')],
+    ['swift', () => require('highlight.js/lib/languages/swift')],
+    ['typescript', () => require('highlight.js/lib/languages/typescript')],
+    ['yaml', () => require('highlight.js/lib/languages/yaml')],
+];
+for (const [name, load] of languages) {
+    hljs.registerLanguage(name, load());
+}
+// Common aliases — hljs.getLanguage accepts these so users can use `sh`, `js`, etc.
+hljs.registerAliases(['sh', 'zsh'], { languageName: 'bash' });
+hljs.registerAliases(['js', 'mjs'], { languageName: 'javascript' });
+hljs.registerAliases(['ts'], { languageName: 'typescript' });
+hljs.registerAliases(['py'], { languageName: 'python' });
+hljs.registerAliases(['rb'], { languageName: 'ruby' });
+hljs.registerAliases(['yml'], { languageName: 'yaml' });
+hljs.registerAliases(['cs'], { languageName: 'csharp' });
+hljs.registerAliases(['cxx', 'c++', 'h', 'hpp'], { languageName: 'cpp' });
+hljs.registerAliases(['svg'], { languageName: 'xml' });
+hljs.registerAliases(['md'], { languageName: 'markdown' });
+hljs.registerAliases(['docker'], { languageName: 'dockerfile' });
+hljs.registerAliases(['make'], { languageName: 'makefile' });
+hljs.registerAliases(['ps1'], { languageName: 'powershell' });
+hljs.registerAliases(['text', 'txt'], { languageName: 'plaintext' });
 
 export interface ParseOptions {
     /** Resolve a relative image path to a displayable URI */
