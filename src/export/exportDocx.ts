@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { parseMarkdown } from '../markdownParser';
+import { createImageResolver } from './imageResolver';
 
 export async function exportDocx(document: vscode.TextDocument): Promise<void> {
     await vscode.window.withProgress(
@@ -15,7 +16,11 @@ export async function exportDocx(document: vscode.TextDocument): Promise<void> {
 
             const config = vscode.workspace.getConfiguration('markdown-x');
             const content = document.getText();
-            const htmlContent = parseMarkdown(content);
+            // Embed images as data URIs so html-to-docx can include them
+            const docDir = path.dirname(document.fileName);
+            const htmlContent = parseMarkdown(content, {
+                resolveImageUri: createImageResolver(docDir)
+            });
             const title = path.basename(document.fileName, path.extname(document.fileName));
             const fontFamily = config.get<string>('fontFamily', '') || 'Malgun Gothic';
             const fontSize = config.get<number>('fontSize', 16);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.13 (2026-06-02)
+
+- Fix images missing from PDF / Word / Print exports. Image paths are now embedded as data URIs so Puppeteer (PDF), html-to-docx (Word), and the temp HTML file (Print) can all see them.
+- Auto-refresh hardening:
+  - Trigger on save (`onDidSaveTextDocument`) in addition to typing, so saves never miss a refresh.
+  - Debounce shortened from 300 ms to 200 ms.
+  - Updates that arrive while the preview tab is hidden are now queued and flushed when the tab becomes visible again (previously they were silently dropped).
+- `autoPreviewOnly` mode now uses a single shared preview window. Switching to a different markdown file closes the previous auto preview instead of stacking another panel. Manual previews (Cmd+Shift+V, explorer right-click) still create per-file panels.
+
 ## 0.1.12 (2026-06-01)
 
 Performance:

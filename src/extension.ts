@@ -296,20 +296,27 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('markdown-x.print', markdownGuard(printDocument)),
     );
 
-    // Document change listener — update the matching preview panel
+    // Document change listener — update the matching preview panel.
+    // Fires on every keystroke (debounced 200ms). onDidSaveTextDocument
+    // is a separate trigger so saves always refresh even if the keystroke
+    // event was missed.
     let updateTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const scheduleUpdate = (doc: vscode.TextDocument, delay: number) => {
+        if (doc.languageId !== 'markdown') return;
+        if (!previewProvider.hasPanel(doc.fileName)) return;
+        const key = doc.fileName;
+        const existing = updateTimers.get(key);
+        if (existing) clearTimeout(existing);
+        updateTimers.set(key, setTimeout(() => {
+            updateTimers.delete(key);
+            previewProvider.updateContent(doc);
+        }, delay));
+    };
+
     context.subscriptions.push(
-        vscode.workspace.onDidChangeTextDocument((e) => {
-            if (e.document.languageId === 'markdown') {
-                const key = e.document.fileName;
-                const existing = updateTimers.get(key);
-                if (existing) clearTimeout(existing);
-                updateTimers.set(key, setTimeout(() => {
-                    updateTimers.delete(key);
-                    previewProvider.updateContent(e.document);
-                }, 300));
-            }
-        })
+        vscode.workspace.onDidChangeTextDocument(e => scheduleUpdate(e.document, 200)),
+        // Save fires earlier (no debounce) and bypasses any in-flight typing timer
+        vscode.workspace.onDidSaveTextDocument(doc => scheduleUpdate(doc, 0)),
     );
 
     // Editor scroll -> preview scroll sync

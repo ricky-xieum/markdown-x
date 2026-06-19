@@ -10,6 +10,8 @@ interface PanelState {
     initialized: boolean;
     scrollSyncEnabled: boolean;
     previewFocused: boolean;
+    /** Set when updateContent fired while the panel was hidden; flushed in onDidChangeViewState */
+    pendingUpdate: boolean;
 }
 
 export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
@@ -17,6 +19,14 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
     private extensionUri: vscode.Uri;
     private cachedCustomCss: string = '';
     private lastCustomCssPath: string = '';
+    /**
+     * fileName of the currently-active auto-preview-only panel. The
+     * autoPreviewOnly mode treats the auto preview as a single shared
+     * window — switching markdown files closes the previous one instead
+     * of stacking. Manual previews (Cmd+Shift+V, explorer right-click)
+     * are unaffected.
+     */
+    private autoPanelKey: string | undefined;
 
     constructor(extensionUri: vscode.Uri) {
         this.extensionUri = extensionUri;
@@ -86,6 +96,7 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
+            pendingUpdate: false,
         };
         this.panels.set(key, ps);
         this.setupWebview(key);
@@ -138,6 +149,7 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
+            pendingUpdate: false,
         };
         this.panels.set(key, ps);
         this.setupWebview(key);
@@ -152,9 +164,23 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
     /**
      * Open a preview without the source editor visible. Closes the source
      * tab if one is currently open. Used by autoPreviewOnly mode.
+     *
+     * autoPreviewOnly treats the preview as a single shared window:
+     * switching to a different markdown file closes the previous auto
+     * preview rather than stacking another panel on top.
      */
     async openPreviewOnly(document: vscode.TextDocument): Promise<void> {
         const key = document.fileName;
+
+        // Dispose the previous auto preview if it was for a different file.
+        // Manual previews (opened via openPreview) are not tracked here, so
+        // they survive this cleanup.
+        if (this.autoPanelKey && this.autoPanelKey !== key) {
+            const prev = this.panels.get(this.autoPanelKey);
+            if (prev) prev.panel.dispose();
+            this.autoPanelKey = undefined;
+        }
+
         const existing = this.panels.get(key);
 
         // The source tab (if any) we'll close so only preview is visible
@@ -169,6 +195,7 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             existing.initialized = false;
             existing.document = document;
             this.updateContent(document);
+            this.autoPanelKey = key;
             if (sourceTab) {
                 try { await vscode.window.tabGroups.close(sourceTab); } catch { /* ignore */ }
             }
@@ -200,8 +227,10 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
+            pendingUpdate: false,
         };
         this.panels.set(key, ps);
+        this.autoPanelKey = key;
         this.setupWebview(key);
         this.updateContent(document);
         vscode.commands.executeCommand('setContext', 'markdown-x:previewOpen', true);
@@ -255,6 +284,7 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         ps.panel.onDidDispose(
             () => {
                 this.panels.delete(key);
+                if (this.autoPanelKey === key) this.autoPanelKey = undefined;
                 if (this.panels.size === 0) {
                     vscode.commands.executeCommand('setContext', 'markdown-x:previewOpen', false);
                 }
@@ -266,6 +296,10 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         ps.panel.onDidChangeViewState(
             (e) => {
                 ps.previewFocused = e.webviewPanel.active;
+                // Flush a pending update if the panel just became visible
+                if (e.webviewPanel.visible && ps.pendingUpdate) {
+                    this.updateContent(ps.document);
+                }
             },
             null,
             []
@@ -426,6 +460,15 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
 
         ps.document = document;
         ps.panel.title = `Preview: ${path.basename(document.fileName)}`;
+
+        // If the panel is hidden (another tab is in front), VS Code drops
+        // postMessage and may suspend the webview. Mark a pending update
+        // and let onDidChangeViewState flush it when the user comes back.
+        if (!ps.panel.visible) {
+            ps.pendingUpdate = true;
+            return;
+        }
+        ps.pendingUpdate = false;
 
         if (!ps.initialized) {
             const html = this.generateHtml(ps, document.getText(), document.fileName);

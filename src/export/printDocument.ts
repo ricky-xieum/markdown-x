@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { parseMarkdown } from '../markdownParser';
 import { getExportHtml } from './printStyles';
+import { createImageResolver } from './imageResolver';
 
 /**
  * Print by opening a temporary HTML file in the system browser,
@@ -12,7 +13,12 @@ import { getExportHtml } from './printStyles';
 export async function printDocument(document: vscode.TextDocument): Promise<void> {
     const config = vscode.workspace.getConfiguration('markdown-x');
     const content = document.getText();
-    const htmlContent = parseMarkdown(content);
+    // Embed images as data URIs — the temp HTML file lives in /tmp and
+    // relative paths from there won't resolve back to the original folder
+    const docDir = path.dirname(document.fileName);
+    const htmlContent = parseMarkdown(content, {
+        resolveImageUri: createImageResolver(docDir)
+    });
     const title = path.basename(document.fileName, path.extname(document.fileName));
 
     // Read custom CSS file if configured

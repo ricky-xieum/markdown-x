@@ -5,6 +5,7 @@ import { parseMarkdown } from '../markdownParser';
 import { getExportHtml } from './printStyles';
 import { findChromePath } from './chromeFinder';
 import { getPageBreakScript } from './pageBreakProcessor';
+import { createImageResolver } from './imageResolver';
 
 export interface PdfOptions {
     outputPath: string;
@@ -36,7 +37,12 @@ export async function generatePdf(
     const content = document.getText();
 
     progress.report({ increment: 10, message: 'Parsing markdown...' });
-    const htmlContent = parseMarkdown(content);
+    // Embed images as data URIs — Puppeteer's about:blank page (setContent)
+    // cannot reach file:// resources directly
+    const docDir = path.dirname(document.fileName);
+    const htmlContent = parseMarkdown(content, {
+        resolveImageUri: createImageResolver(docDir)
+    });
 
     const exportHtml = getExportHtml(htmlContent, {
         title: options.title,
