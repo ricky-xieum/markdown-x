@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.14 (2026-06-21)
+
+- Render PlantUML, D2, Graphviz, Pikchr, Svgbob, Nomnoml, WaveDrom, Vega/Vega-Lite, and ~20 more diagram formats via Kroki. The code-block language identifier (e.g. ` ```plantuml `, ` ```d2 `, ` ```dot `) is routed to the Kroki server and the SVG is inlined as an `<img>`.
+- New settings:
+  - `markdown-x.enableKroki` (boolean, default `true`)
+  - `markdown-x.krokiServerUrl` (string, default `https://kroki.io`) — point at your self-hosted Kroki instance for offline / private use.
+
 ## 0.1.13 (2026-06-02)
 
 - Fix images missing from PDF / Word / Print exports. Image paths are now embedded as data URIs so Puppeteer (PDF), html-to-docx (Word), and the temp HTML file (Print) can all see them.

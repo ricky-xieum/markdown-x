@@ -537,6 +537,10 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
 
     private renderMarkdown(webview: vscode.Webview, content: string, filePath: string): string {
         const docDir = path.dirname(filePath);
+        const config = vscode.workspace.getConfiguration('markdown-x');
+        const krokiServerUrl = config.get<boolean>('enableKroki', true)
+            ? config.get<string>('krokiServerUrl', 'https://kroki.io')
+            : undefined;
 
         return parseMarkdown(content, {
             resolveImageUri: (src: string) => {
@@ -547,7 +551,8 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
                 }
                 const absPath = path.isAbsolute(cleanSrc) ? cleanSrc : path.join(docDir, cleanSrc);
                 return webview.asWebviewUri(vscode.Uri.file(absPath)).toString();
-            }
+            },
+            krokiServerUrl,
         });
     }
 
@@ -732,6 +737,16 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         .mermaid {
             text-align: center; margin: 1em 0; position: relative;
             max-width: 100%; margin-left: auto; margin-right: auto;
+        }
+
+        /* Kroki diagrams (PlantUML, D2, Graphviz, etc.) — rendered server-side as SVG */
+        .kroki-diagram {
+            text-align: center; margin: 1em 0;
+            max-width: 100%;
+        }
+        .kroki-diagram img {
+            max-width: 100%; height: auto;
+            cursor: ${enableImageLightbox ? 'zoom-in' : 'default'};
         }
         .mermaid:not([data-processed="true"]):not(:has(svg)) { opacity: 0; height: 0; overflow: hidden; }
         .mermaid[data-processed="true"], .mermaid:has(svg) { opacity: 1; height: auto; }

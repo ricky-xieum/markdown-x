@@ -1,5 +1,6 @@
 import { marked, Renderer } from 'marked';
 import hljs from 'highlight.js/lib/core';
+import * as zlib from 'zlib';
 import type { LanguageFn } from 'highlight.js';
 
 // Register only commonly-used languages instead of the full ~190-language
@@ -62,6 +63,62 @@ hljs.registerAliases(['text', 'txt'], { languageName: 'plaintext' });
 export interface ParseOptions {
     /** Resolve a relative image path to a displayable URI */
     resolveImageUri?: (relativePath: string) => string;
+    /** Kroki server URL (e.g. https://kroki.io) — empty/undefined disables Kroki rendering */
+    krokiServerUrl?: string;
+}
+
+/**
+ * Code-block languages routed through Kroki (https://docs.kroki.io/kroki/).
+ * Maps the markdown info string the user types to Kroki's diagram type
+ * segment in the URL.
+ */
+const KROKI_LANG_MAP: Record<string, string> = {
+    plantuml: 'plantuml',
+    puml: 'plantuml',
+    'c4-plantuml': 'c4plantuml',
+    c4plantuml: 'c4plantuml',
+    d2: 'd2',
+    graphviz: 'graphviz',
+    dot: 'graphviz',
+    blockdiag: 'blockdiag',
+    seqdiag: 'seqdiag',
+    actdiag: 'actdiag',
+    nwdiag: 'nwdiag',
+    rackdiag: 'rackdiag',
+    packetdiag: 'packetdiag',
+    bpmn: 'bpmn',
+    bytefield: 'bytefield',
+    erd: 'erd',
+    excalidraw: 'excalidraw',
+    nomnoml: 'nomnoml',
+    pikchr: 'pikchr',
+    structurizr: 'structurizr',
+    svgbob: 'svgbob',
+    tikz: 'tikz',
+    umlet: 'umlet',
+    vega: 'vega',
+    vegalite: 'vegalite',
+    'vega-lite': 'vegalite',
+    wavedrom: 'wavedrom',
+    wireviz: 'wireviz',
+    diagramsnet: 'diagramsnet',
+    ditaa: 'ditaa',
+    mscgen: 'mscgen',
+    symbolator: 'symbolator',
+};
+
+/**
+ * Encode diagram source for Kroki's GET endpoint: zlib deflate + base64url.
+ * Kroki requires zlib-wrapped deflate (with the 2-byte header), not raw
+ * deflate — deflateRawSync produces output Kroki rejects as "Unable to
+ * decode the source." https://docs.kroki.io/kroki/setup/encode-diagram/
+ */
+function encodeKrokiSource(source: string): string {
+    const compressed = zlib.deflateSync(Buffer.from(source, 'utf8'), { level: 9 });
+    return compressed
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
 }
 
 function escapeHtml(str: string): string {
@@ -230,7 +287,7 @@ export function parseMarkdown(content: string, opts: ParseOptions = {}): string 
     };
 
     renderer.code = (code: string, infostring: string | undefined, _escaped: boolean): string => {
-        const lang = (infostring || '').trim();
+        const lang = (infostring || '').trim().toLowerCase();
         if (lang === 'mermaid') {
             const scale = pendingMermaidScale || '100';
             pendingMermaidScale = '';
@@ -239,6 +296,15 @@ export function parseMarkdown(content: string, opts: ParseOptions = {}): string 
             // are added/removed/reordered or their content edited)
             const encodedSource = encodeURIComponent(code);
             return `<div class="mermaid" data-scale="${scale}" data-source="${encodedSource}">${code}</div>`;
+        }
+        // Kroki — route PlantUML / D2 / Graphviz / etc. through the Kroki
+        // rendering server. Encoded as zlib-deflate + base64url per Kroki spec.
+        const krokiType = KROKI_LANG_MAP[lang];
+        if (krokiType && opts.krokiServerUrl) {
+            const server = opts.krokiServerUrl.replace(/\/$/, '');
+            const encoded = encodeKrokiSource(code);
+            const url = `${server}/${krokiType}/svg/${encoded}`;
+            return `<div class="kroki-diagram" data-kroki-type="${krokiType}"><img src="${url}" alt="${krokiType} diagram" loading="lazy"></div>`;
         }
         let highlighted: string;
         if (lang && hljs.getLanguage(lang)) {

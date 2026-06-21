@@ -24,6 +24,8 @@
   "markdown-x.configuration.fontSize": "Font size in pixels",
   "markdown-x.configuration.lineHeight": "Line height multiplier",
   "markdown-x.configuration.enableMermaid": "Enable Mermaid diagram rendering",
+  "markdown-x.configuration.enableKroki": "Enable Kroki rendering for PlantUML, D2, Graphviz, BlockDiag, BPMN, Excalidraw, Pikchr, Svgbob, Vega, WaveDrom and more",
+  "markdown-x.configuration.krokiServerUrl": "Kroki server URL (use https://kroki.io or your self-hosted instance)",
   "markdown-x.configuration.enableImageLightbox": "Enable image lightbox on click",
   "markdown-x.configuration.enableScrollSync": "Enable scroll synchronization between editor and preview",
   "markdown-x.configuration.autoPreviewOnly": "Automatically open preview only (no source editor) when a markdown file is opened. The source editor can still be reached via the toolbar \"Show Source\" button or Cmd/Ctrl+Shift+V.",

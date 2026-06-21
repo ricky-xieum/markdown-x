@@ -24,6 +24,8 @@
   "markdown-x.configuration.fontSize": "글꼴 크기 (픽셀)",
   "markdown-x.configuration.lineHeight": "줄 높이 배율",
   "markdown-x.configuration.enableMermaid": "Mermaid 다이어그램 렌더링 활성화",
+  "markdown-x.configuration.enableKroki": "Kroki 렌더링 활성화 (PlantUML, D2, Graphviz, BlockDiag, BPMN, Excalidraw, Pikchr, Svgbob, Vega, WaveDrom 등)",
+  "markdown-x.configuration.krokiServerUrl": "Kroki 서버 URL (https://kroki.io 또는 자체 호스트 인스턴스)",
   "markdown-x.configuration.enableImageLightbox": "이미지 라이트박스 활성화",
   "markdown-x.configuration.enableScrollSync": "편집기와 미리보기 간 스크롤 동기화 활성화",
   "markdown-x.configuration.autoPreviewOnly": "마크다운 파일을 열 때 미리보기만 자동으로 표시 (소스 에디터는 닫힘). 소스가 필요하면 툴바의 \"원본 보기\" 버튼이나 Cmd/Ctrl+Shift+V로 열기 가능.",

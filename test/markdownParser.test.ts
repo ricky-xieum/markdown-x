@@ -76,6 +76,44 @@ test('renders mermaid blocks as div.mermaid', () => {
     assert.ok(!html.includes('<pre>'));
 });
 
+test('renders plantuml via Kroki as img tag', () => {
+    const html = parseMarkdown('```plantuml\n@startuml\nAlice -> Bob\n@enduml\n```', {
+        krokiServerUrl: 'https://kroki.io'
+    });
+    assert.ok(html.includes('<div class="kroki-diagram"'));
+    assert.ok(html.includes('data-kroki-type="plantuml"'));
+    assert.ok(html.includes('src="https://kroki.io/plantuml/svg/'));
+    assert.ok(!html.includes('<pre>'));
+});
+
+test('renders d2 via Kroki', () => {
+    const html = parseMarkdown('```d2\nfoo -> bar\n```', {
+        krokiServerUrl: 'https://kroki.io'
+    });
+    assert.ok(html.includes('data-kroki-type="d2"'));
+    assert.ok(html.includes('src="https://kroki.io/d2/svg/'));
+});
+
+test('renders graphviz via Kroki for dot alias', () => {
+    const html = parseMarkdown('```dot\ndigraph { a -> b }\n```', {
+        krokiServerUrl: 'https://kroki.io'
+    });
+    assert.ok(html.includes('data-kroki-type="graphviz"'));
+});
+
+test('Kroki disabled when krokiServerUrl is absent — falls back to code block', () => {
+    const html = parseMarkdown('```plantuml\n@startuml\nA->B\n@enduml\n```');
+    assert.ok(!html.includes('kroki-diagram'));
+    assert.ok(html.includes('<pre>'));
+});
+
+test('Kroki respects custom server URL with trailing slash', () => {
+    const html = parseMarkdown('```plantuml\nA -> B\n```', {
+        krokiServerUrl: 'http://localhost:8000/'
+    });
+    assert.ok(html.includes('src="http://localhost:8000/plantuml/svg/'));
+});
+
 test('renders ??? admonition as collapsed <details>', () => {
     const html = parseMarkdown('??? note "테이블 명단"\n    - item1\n    - item2');
     assert.ok(html.includes('<details'));
