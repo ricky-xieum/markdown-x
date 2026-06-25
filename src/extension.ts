@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { MarkdownPreviewProvider } from './previewProvider';
 import { exportPdf } from './export/exportPdf';
 import { exportDocx } from './export/exportDocx';
@@ -6,9 +7,12 @@ import { printDocument } from './export/printDocument';
 import { MarkdownOutlineProvider } from './outlineProvider';
 
 let previewProvider: MarkdownPreviewProvider;
+let outputChannel: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext) {
-    previewProvider = new MarkdownPreviewProvider(context.extensionUri);
+    outputChannel = vscode.window.createOutputChannel('Markdown X');
+    context.subscriptions.push(outputChannel);
+    previewProvider = new MarkdownPreviewProvider(context.extensionUri, outputChannel);
 
     // Register webview provider
     context.subscriptions.push(
@@ -297,26 +301,46 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Document change listener — update the matching preview panel.
-    // Fires on every keystroke (debounced 200ms). onDidSaveTextDocument
-    // is a separate trigger so saves always refresh even if the keystroke
-    // event was missed.
+    // Three trigger sources cover all common edit paths:
+    //   1. onDidChangeTextDocument — in-editor typing (200 ms debounce)
+    //   2. onDidSaveTextDocument   — explicit save (no debounce, flushes typing timer)
+    //   3. FileSystemWatcher       — external file changes (other tools, git pull, etc.)
     let updateTimers = new Map<string, ReturnType<typeof setTimeout>>();
-    const scheduleUpdate = (doc: vscode.TextDocument, delay: number) => {
+    const scheduleUpdate = (doc: vscode.TextDocument | undefined, delay: number, source: string) => {
+        // CRITICAL: filter non-file scheme first (output channels, git fs,
+        // vscode internal docs). Otherwise writing to outputChannel itself
+        // fires onDidChangeTextDocument → we log again → infinite loop.
+        if (!doc || doc.uri.scheme !== 'file') return;
         if (doc.languageId !== 'markdown') return;
         if (!previewProvider.hasPanel(doc.fileName)) return;
+
         const key = doc.fileName;
         const existing = updateTimers.get(key);
         if (existing) clearTimeout(existing);
         updateTimers.set(key, setTimeout(() => {
             updateTimers.delete(key);
+            outputChannel.appendLine(`[refresh] ${source} → ${path.basename(doc.fileName)}`);
             previewProvider.updateContent(doc);
         }, delay));
     };
 
     context.subscriptions.push(
-        vscode.workspace.onDidChangeTextDocument(e => scheduleUpdate(e.document, 200)),
-        // Save fires earlier (no debounce) and bypasses any in-flight typing timer
-        vscode.workspace.onDidSaveTextDocument(doc => scheduleUpdate(doc, 0)),
+        vscode.workspace.onDidChangeTextDocument(e => scheduleUpdate(e.document, 200, 'type')),
+        vscode.workspace.onDidSaveTextDocument(doc => scheduleUpdate(doc, 0, 'save')),
+    );
+
+    // External edits (other editor, git pull, formatter on save by another extension, etc.)
+    const fsWatcher = vscode.workspace.createFileSystemWatcher('**/*.{md,markdown,mdx}');
+    const onFileChange = (uri: vscode.Uri) => {
+        const doc = vscode.workspace.textDocuments.find(
+            d => d.uri.toString() === uri.toString()
+        );
+        scheduleUpdate(doc, 0, 'fs-watcher');
+    };
+    context.subscriptions.push(
+        fsWatcher,
+        fsWatcher.onDidChange(onFileChange),
+        fsWatcher.onDidCreate(onFileChange),
     );
 
     // Editor scroll -> preview scroll sync

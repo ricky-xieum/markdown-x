@@ -147,6 +147,29 @@ test('??? inside code block is not transformed', () => {
     assert.ok(html.includes('??? note'));
 });
 
+test('renders !!! admonition as non-collapsible <aside>', () => {
+    const html = parseMarkdown('!!! info "WAF 단독으로 되돌아온 배경"\n    내용 본문');
+    assert.ok(html.includes('<aside'));
+    assert.ok(html.includes('admonition-info'));
+    assert.ok(html.includes('admonition-title'));
+    assert.ok(html.includes('WAF 단독으로 되돌아온 배경'));
+    assert.ok(html.includes('내용 본문'));
+    assert.ok(html.includes('</aside>'));
+    assert.ok(!html.includes('<details'));
+});
+
+test('!!! body supports nested markdown', () => {
+    const html = parseMarkdown('!!! warning "주의"\n    **굵게** 그리고 `코드`');
+    assert.ok(html.includes('<strong>굵게</strong>'));
+    assert.ok(html.includes('<code>코드</code>'));
+});
+
+test('!!! inside code block is not transformed', () => {
+    const html = parseMarkdown('```\n!!! info "ignored"\n    body\n```');
+    assert.ok(!html.includes('<aside'));
+    assert.ok(html.includes('!!! info'));
+});
+
 test('plain <details> HTML is allowed through', () => {
     const html = parseMarkdown('<details>\n<summary>Title</summary>\n\n- item\n\n</details>');
     assert.ok(html.includes('<details>'));

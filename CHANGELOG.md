@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.15 (2026-06-25)
+
+- Add `!!!` non-collapsible admonition syntax (Material for MkDocs compatible). Renders as a callout box with type-based accent color; `???` / `???+` continue to render as a collapsible `<details>`.
+- Auto-refresh hardening + critical bug fix:
+  - Filter out non-`file:` scheme documents from refresh triggers. Previously every `OutputChannel.appendLine` write created a `TextDocument` change event, which our handler logged again, creating a feedback loop that could starve real markdown edits.
+  - Add `FileSystemWatcher` for `**/*.{md,markdown,mdx}` so external edits (other editors, git pull, formatter from another extension) are picked up too.
+  - Optional "Markdown X" Output channel logs each refresh source (`type` / `save` / `fs-watcher`) and the `updateContent` result for diagnostics.
+
 ## 0.1.14 (2026-06-21)
 
 - Render PlantUML, D2, Graphviz, Pikchr, Svgbob, Nomnoml, WaveDrom, Vega/Vega-Lite, and ~20 more diagram formats via Kroki. The code-block language identifier (e.g. ` ```plantuml `, ` ```d2 `, ` ```dot `) is routed to the Kroki server and the SVG is inlined as an `<img>`.

@@ -27,9 +27,15 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
      * are unaffected.
      */
     private autoPanelKey: string | undefined;
+    private outputChannel: vscode.OutputChannel | undefined;
 
-    constructor(extensionUri: vscode.Uri) {
+    constructor(extensionUri: vscode.Uri, outputChannel?: vscode.OutputChannel) {
         this.extensionUri = extensionUri;
+        this.outputChannel = outputChannel;
+    }
+
+    private log(msg: string): void {
+        this.outputChannel?.appendLine(msg);
     }
 
     async deserializeWebviewPanel(
@@ -461,11 +467,14 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         ps.document = document;
         ps.panel.title = `Preview: ${path.basename(document.fileName)}`;
 
+        const basename = path.basename(document.fileName);
+
         // If the panel is hidden (another tab is in front), VS Code drops
         // postMessage and may suspend the webview. Mark a pending update
         // and let onDidChangeViewState flush it when the user comes back.
         if (!ps.panel.visible) {
             ps.pendingUpdate = true;
+            this.log(`[updateContent] ${basename}: panel hidden → pendingUpdate`);
             return;
         }
         ps.pendingUpdate = false;
@@ -474,6 +483,7 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             const html = this.generateHtml(ps, document.getText(), document.fileName);
             ps.panel.webview.html = html;
             ps.initialized = true;
+            this.log(`[updateContent] ${basename}: initial full render`);
             return;
         }
 
@@ -487,6 +497,9 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             const html = this.generateHtml(ps, document.getText(), document.fileName);
             ps.panel.webview.html = html;
             ps.initialized = true;
+            this.log(`[updateContent] ${basename}: postMessage dropped → full re-render`);
+        } else {
+            this.log(`[updateContent] ${basename}: incremental ok`);
         }
     }
 
@@ -803,13 +816,35 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         details > summary + * { margin-top: 0.6em; }
         details > *:last-child { margin-bottom: 0; }
 
-        /* Admonition type accents */
-        details.admonition-note     { border-left-color: #0969da; }
-        details.admonition-info     { border-left-color: #1f6feb; }
-        details.admonition-tip      { border-left-color: #1a7f37; }
-        details.admonition-warning  { border-left-color: #bf8700; }
+        /* Non-collapsible callouts (from !!! syntax) */
+        aside.admonition {
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--link-color);
+            border-radius: 6px;
+            padding: 0.5em 1em;
+            margin: 1em 0;
+            background-color: var(--blockquote-bg);
+            display: block;
+        }
+        aside.admonition > .admonition-title {
+            font-weight: 600;
+            margin: 0.2em 0 0.6em 0;
+        }
+        aside.admonition > *:last-child { margin-bottom: 0; }
+
+        /* Admonition type accents (apply to both <details> and <aside>) */
+        details.admonition-note,
+        aside.admonition-note     { border-left-color: #0969da; }
+        details.admonition-info,
+        aside.admonition-info     { border-left-color: #1f6feb; }
+        details.admonition-tip,
+        aside.admonition-tip      { border-left-color: #1a7f37; }
+        details.admonition-warning,
+        aside.admonition-warning  { border-left-color: #bf8700; }
         details.admonition-danger,
-        details.admonition-error    { border-left-color: #cf222e; }
+        details.admonition-error,
+        aside.admonition-danger,
+        aside.admonition-error    { border-left-color: #cf222e; }
 
         .container { position: relative; }
 
