@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 (2026-06-26)
+
+Breaking: auto-refresh has been removed in favor of a reliable manual refresh.
+
+- Remove the typing / save / file-watcher auto-refresh triggers and the diagnostic Output channel.
+- New `Mx: Refresh Preview` command, available from:
+  - the refresh button on the preview toolbar (next to Show Source)
+  - the command palette
+  - `Cmd/Ctrl+R` while the preview panel is focused
+
 ## 0.1.15 (2026-06-25)
 
 - Add `!!!` non-collapsible admonition syntax (Material for MkDocs compatible). Renders as a callout box with type-based accent color; `???` / `???+` continue to render as a collapsible `<details>`.

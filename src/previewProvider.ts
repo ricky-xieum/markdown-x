@@ -27,15 +27,26 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
      * are unaffected.
      */
     private autoPanelKey: string | undefined;
-    private outputChannel: vscode.OutputChannel | undefined;
 
-    constructor(extensionUri: vscode.Uri, outputChannel?: vscode.OutputChannel) {
+    constructor(extensionUri: vscode.Uri) {
         this.extensionUri = extensionUri;
-        this.outputChannel = outputChannel;
     }
 
-    private log(msg: string): void {
-        this.outputChannel?.appendLine(msg);
+    /**
+     * Re-render the focused preview (or all previews if none focused) from
+     * the current document content. Used by the manual Refresh button.
+     */
+    refresh(): void {
+        const focused = Array.from(this.panels.values()).find(ps => ps.previewFocused);
+        const targets = focused ? [focused] : Array.from(this.panels.values());
+        for (const ps of targets) {
+            // Re-read the document content fresh from VS Code
+            const doc = vscode.workspace.textDocuments.find(
+                d => d.fileName === ps.document.fileName
+            ) ?? ps.document;
+            ps.initialized = false;
+            this.updateContent(doc);
+        }
     }
 
     async deserializeWebviewPanel(
@@ -467,14 +478,11 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         ps.document = document;
         ps.panel.title = `Preview: ${path.basename(document.fileName)}`;
 
-        const basename = path.basename(document.fileName);
-
         // If the panel is hidden (another tab is in front), VS Code drops
         // postMessage and may suspend the webview. Mark a pending update
         // and let onDidChangeViewState flush it when the user comes back.
         if (!ps.panel.visible) {
             ps.pendingUpdate = true;
-            this.log(`[updateContent] ${basename}: panel hidden → pendingUpdate`);
             return;
         }
         ps.pendingUpdate = false;
@@ -483,7 +491,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             const html = this.generateHtml(ps, document.getText(), document.fileName);
             ps.panel.webview.html = html;
             ps.initialized = true;
-            this.log(`[updateContent] ${basename}: initial full render`);
             return;
         }
 
@@ -497,9 +504,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             const html = this.generateHtml(ps, document.getText(), document.fileName);
             ps.panel.webview.html = html;
             ps.initialized = true;
-            this.log(`[updateContent] ${basename}: postMessage dropped → full re-render`);
-        } else {
-            this.log(`[updateContent] ${basename}: incremental ok`);
         }
     }
 

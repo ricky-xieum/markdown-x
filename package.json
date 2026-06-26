@@ -2,7 +2,7 @@
   "name": "markdown-x",
   "displayName": "Markdown X",
   "description": "Ultimate Markdown Viewer with PDF/Word export, page-aware layout, Mermaid diagrams, KaTeX math, and custom themes",
-  "version": "0.1.15",
+  "version": "0.2.0",
   "publisher": "xieum-cloud",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -69,6 +69,12 @@
         "key": "ctrl+k v",
         "mac": "cmd+k v",
         "when": "editorLangId == markdown"
+      },
+      {
+        "command": "markdown-x.refreshPreview",
+        "key": "ctrl+r",
+        "mac": "cmd+r",
+        "when": "activeWebviewPanelId == markdown-x-preview"
       }
     ],
     "commands": [
@@ -77,6 +83,12 @@
         "title": "%markdown-x.commands.openPreview%",
         "category": "Markdown X",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "markdown-x.refreshPreview",
+        "title": "%markdown-x.commands.refreshPreview%",
+        "category": "Markdown X",
+        "icon": "$(refresh)"
       },
       {
         "command": "markdown-x.exportPdf",
@@ -190,6 +202,11 @@
           "when": "activeWebviewPanelId == markdown-x-preview"
         },
         {
+          "command": "markdown-x.refreshPreview",
+          "group": "navigation@0.5",
+          "when": "activeWebviewPanelId == markdown-x-preview"
+        },
+        {
           "command": "markdown-x.togglePagePreview",
           "group": "navigation@1",
           "when": "editorLangId == markdown || activeWebviewPanelId == markdown-x-preview"
@@ -275,6 +292,10 @@
         {
           "command": "markdown-x.openPreview",
           "when": "true"
+        },
+        {
+          "command": "markdown-x.refreshPreview",
+          "when": "markdown-x:previewOpen"
         },
         {
           "command": "markdown-x.exportPdf",
