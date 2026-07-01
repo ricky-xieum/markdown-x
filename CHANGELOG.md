@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2026-06-27)
+
+- Fix Mx: Refresh Preview button/command sometimes doing nothing. The refresh path was going through `updateContent`, which skips work when the panel's `visible` flag is briefly false — that's the right behavior for background auto-updates but the wrong behavior for a user-initiated click. Refresh now bypasses the visibility gate and forces a full HTML rebuild via `generateHtml` directly.
+- Use the panel's original `document.uri` when calling `vscode.workspace.openTextDocument` so the freshest in-memory document (including unsaved edits) is picked up reliably.
+
 ## 0.2.0 (2026-06-26)
 
 Breaking: auto-refresh has been removed in favor of a reliable manual refresh.

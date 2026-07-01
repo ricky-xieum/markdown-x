@@ -301,8 +301,9 @@ export function activate(context: vscode.ExtensionContext) {
     // calls this command to re-render the focused preview from the current
     // document content.
     context.subscriptions.push(
-        vscode.commands.registerCommand('markdown-x.refreshPreview', () => {
-            previewProvider.refresh();
+        vscode.commands.registerCommand('markdown-x.refreshPreview', async () => {
+            await previewProvider.refresh();
+            vscode.window.setStatusBarMessage('Markdown X: Preview refreshed', 1500);
         })
     );
 

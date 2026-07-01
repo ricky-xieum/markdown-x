@@ -33,20 +33,45 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
     }
 
     /**
-     * Re-render the focused preview (or all previews if none focused) from
-     * the current document content. Used by the manual Refresh button.
+     * Re-render the target preview from scratch. Bypasses the visibility
+     * check in `updateContent` — the user explicitly asked for a refresh,
+     * so we force a full HTML rebuild whether the panel is visible or not.
+     *
+     * Uses the panel's original `document.uri` directly rather than
+     * reconstructing via `Uri.file(fileName)` so URI equality is preserved.
      */
-    refresh(): void {
-        const focused = Array.from(this.panels.values()).find(ps => ps.previewFocused);
-        const targets = focused ? [focused] : Array.from(this.panels.values());
-        for (const ps of targets) {
-            // Re-read the document content fresh from VS Code
-            const doc = vscode.workspace.textDocuments.find(
-                d => d.fileName === ps.document.fileName
-            ) ?? ps.document;
-            ps.initialized = false;
-            this.updateContent(doc);
+    async refresh(): Promise<void> {
+        // Pick the target panel — focused > visible > first
+        let target: PanelState | undefined;
+        for (const ps of this.panels.values()) {
+            if (ps.previewFocused) { target = ps; break; }
         }
+        if (!target) {
+            for (const ps of this.panels.values()) {
+                if (ps.panel.visible) { target = ps; break; }
+            }
+        }
+        if (!target) {
+            target = this.panels.values().next().value;
+        }
+        if (!target) return;
+
+        // Get the freshest document via workspace API. openTextDocument
+        // returns the live in-memory instance if one is already open, or
+        // loads from disk otherwise.
+        let doc: vscode.TextDocument = target.document;
+        try {
+            doc = await vscode.workspace.openTextDocument(target.document.uri);
+        } catch { /* fall back to cached */ }
+        target.document = doc;
+
+        // Full HTML rebuild — bypass updateContent's visibility gate so
+        // the refresh takes effect immediately even if the panel happens
+        // to be behind another tab at click time.
+        const html = this.generateHtml(target, doc.getText(), doc.fileName);
+        target.panel.webview.html = html;
+        target.initialized = true;
+        target.pendingUpdate = false;
     }
 
     async deserializeWebviewPanel(
