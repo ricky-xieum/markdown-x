@@ -33,12 +33,20 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
     }
 
     /**
-     * Re-render the target preview from scratch. Bypasses the visibility
-     * check in `updateContent` — the user explicitly asked for a refresh,
-     * so we force a full HTML rebuild whether the panel is visible or not.
+     * Nuke-and-pave refresh: dispose the existing WebviewPanel entirely
+     * and create a brand-new one in the same column.
      *
-     * Uses the panel's original `document.uri` directly rather than
-     * reconstructing via `Uri.file(fileName)` so URI equality is preserved.
+     * Previous attempts at reusing the same webview and re-assigning
+     * `webview.html` proved unreliable — VS Code's webview / Chromium
+     * layer sometimes retained stale DOM/cache state that we couldn't
+     * force to reload from the extension side. Replacing the panel is
+     * the equivalent of the user hitting F5 in a browser tab: zero state
+     * carries over, and the new content is what's on disk / in memory.
+     *
+     * Trade-offs: scroll position is lost, brief flicker while the new
+     * webview mounts, and any embedded assets (Mermaid, Kroki images,
+     * KaTeX fonts) are re-fetched. For a user-initiated refresh those
+     * are acceptable — the whole point is a clean slate.
      */
     async refresh(): Promise<void> {
         // Pick the target panel — focused > visible > first
@@ -56,22 +64,61 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         }
         if (!target) return;
 
-        // Get the freshest document via workspace API. openTextDocument
-        // returns the live in-memory instance if one is already open, or
-        // loads from disk otherwise.
+        // Snapshot state we need to recreate the panel identically
+        const oldPanel = target.panel;
+        const column = oldPanel.viewColumn ?? vscode.ViewColumn.Active;
+        const fileName = target.document.fileName;
+        const wasAutoPanel = this.autoPanelKey === fileName;
+
+        // Load freshest document (in-memory if open, disk otherwise)
         let doc: vscode.TextDocument = target.document;
         try {
             doc = await vscode.workspace.openTextDocument(target.document.uri);
         } catch { /* fall back to cached */ }
-        target.document = doc;
 
-        // Full HTML rebuild — bypass updateContent's visibility gate so
-        // the refresh takes effect immediately even if the panel happens
-        // to be behind another tab at click time.
-        const html = this.generateHtml(target, doc.getText(), doc.fileName);
-        target.panel.webview.html = html;
-        target.initialized = true;
-        target.pendingUpdate = false;
+        // Dispose the old panel. onDidDispose runs synchronously and
+        // removes the entry from this.panels + clears autoPanelKey if it
+        // matched — we restore both below.
+        oldPanel.dispose();
+
+        // Build a fresh panel in the same column
+        const panel = vscode.window.createWebviewPanel(
+            'markdown-x-preview',
+            `Preview: ${path.basename(fileName)}`,
+            { viewColumn: column, preserveFocus: false },
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: [
+                    this.extensionUri,
+                    vscode.Uri.file(path.dirname(fileName)),
+                    ...(vscode.workspace.workspaceFolders?.map(f => f.uri) || [])
+                ]
+            }
+        );
+
+        const ps: PanelState = {
+            panel,
+            document: doc,
+            initialized: false,
+            scrollSyncEnabled: false,
+            previewFocused: false,
+            pendingUpdate: false,
+        };
+        this.panels.set(fileName, ps);
+        if (wasAutoPanel) this.autoPanelKey = fileName;
+        this.setupWebview(fileName);
+
+        // Render fresh HTML directly (bypass updateContent's visibility gate)
+        const html = this.generateHtml(ps, doc.getText(), fileName);
+        panel.webview.html = html;
+        ps.initialized = true;
+
+        vscode.commands.executeCommand('setContext', 'markdown-x:previewOpen', true);
+        setTimeout(() => {
+            const s = this.panels.get(fileName);
+            if (s) s.scrollSyncEnabled = true;
+        }, 2000);
     }
 
     async deserializeWebviewPanel(

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-06-27)
+
+- Mx: Refresh Preview now disposes the WebviewPanel and creates a brand-new one in the same column, instead of reusing the panel and re-assigning `webview.html`. Reassigning HTML on an existing webview was proving unreliable — VS Code / Chromium sometimes retained stale DOM or cache state that we couldn't force to reload from the extension side. Recreating the panel is the equivalent of the user hitting F5 in a browser tab and is now the only refresh path we ship. Trade-off: scroll position resets and embedded assets (Mermaid, Kroki, KaTeX) re-fetch, which is intentional for a "clean slate" refresh.
+
 ## 0.2.1 (2026-06-27)
 
 - Fix Mx: Refresh Preview button/command sometimes doing nothing. The refresh path was going through `updateContent`, which skips work when the panel's `visible` flag is briefly false — that's the right behavior for background auto-updates but the wrong behavior for a user-initiated click. Refresh now bypasses the visibility gate and forces a full HTML rebuild via `generateHtml` directly.
