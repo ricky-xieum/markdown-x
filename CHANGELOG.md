@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.3 (2026-06-27)
+
+Auto-refresh is back, and the update path is now simplified to match VS Code's built-in markdown preview:
+
+- Restore `onDidChangeTextDocument` (typing, 200 ms debounce) and `onDidSaveTextDocument` (save, immediate) triggers. Non-`file:` schemes are filtered so writes into Output channels / git buffers / other virtual docs can't feedback-loop.
+- Drop the `!ps.panel.visible` gate and the `pendingUpdate` bookkeeping from `updateContent`. `retainContextWhenHidden: true` already keeps hidden webviews alive and `postMessage` delivers regardless of which tab is in front — no need for us to defer updates.
+- Drop the `postMessage` delivery fallback that used to fire a full HTML rewrite. If a message ever really is dropped, the manual Refresh button (nuke-and-pave dispose+recreate, added in 0.2.2) covers the edge case.
+- Result: `updateContent` is ~10 lines instead of ~30, with no branching outside the initial-render check. Automatic refresh should now behave the same as the built-in previewer.
+
 ## 0.2.2 (2026-06-27)
 
 - Mx: Refresh Preview now disposes the WebviewPanel and creates a brand-new one in the same column, instead of reusing the panel and re-assigning `webview.html`. Reassigning HTML on an existing webview was proving unreliable — VS Code / Chromium sometimes retained stale DOM or cache state that we couldn't force to reload from the extension side. Recreating the panel is the equivalent of the user hitting F5 in a browser tab and is now the only refresh path we ship. Trade-off: scroll position resets and embedded assets (Mermaid, Kroki, KaTeX) re-fetch, which is intentional for a "clean slate" refresh.

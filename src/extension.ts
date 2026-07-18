@@ -296,15 +296,35 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('markdown-x.print', markdownGuard(printDocument)),
     );
 
-    // Manual refresh — auto-refresh has been removed per user feedback.
-    // The Refresh button on the preview toolbar / command palette / shortcut
-    // calls this command to re-render the focused preview from the current
-    // document content.
+    // Manual refresh — nuke-and-pave. Disposes the WebviewPanel and
+    // creates a brand-new one; effectively F5 in a browser tab.
     context.subscriptions.push(
         vscode.commands.registerCommand('markdown-x.refreshPreview', async () => {
             await previewProvider.refresh();
             vscode.window.setStatusBarMessage('Markdown X: Preview refreshed', 1500);
         })
+    );
+
+    // Auto-refresh — VS Code built-in markdown preview style. Filters
+    // out non-file: URIs so writes to output channels / git buffers /
+    // internal doc streams don't feedback-loop. Debounced 200 ms.
+    const updateTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const scheduleUpdate = (doc: vscode.TextDocument | undefined, delay: number) => {
+        if (doc?.uri.scheme !== 'file') return;
+        if (doc.languageId !== 'markdown') return;
+        if (!previewProvider.hasPanel(doc.fileName)) return;
+        const key = doc.fileName;
+        const existing = updateTimers.get(key);
+        if (existing) clearTimeout(existing);
+        updateTimers.set(key, setTimeout(() => {
+            updateTimers.delete(key);
+            previewProvider.updateContent(doc);
+        }, delay));
+    };
+
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument(e => scheduleUpdate(e.document, 200)),
+        vscode.workspace.onDidSaveTextDocument(doc => scheduleUpdate(doc, 0)),
     );
 
     // Editor scroll -> preview scroll sync

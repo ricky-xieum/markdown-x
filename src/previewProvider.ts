@@ -10,8 +10,6 @@ interface PanelState {
     initialized: boolean;
     scrollSyncEnabled: boolean;
     previewFocused: boolean;
-    /** Set when updateContent fired while the panel was hidden; flushed in onDidChangeViewState */
-    pendingUpdate: boolean;
 }
 
 export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
@@ -103,7 +101,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
-            pendingUpdate: false,
         };
         this.panels.set(fileName, ps);
         if (wasAutoPanel) this.autoPanelKey = fileName;
@@ -185,7 +182,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
-            pendingUpdate: false,
         };
         this.panels.set(key, ps);
         this.setupWebview(key);
@@ -238,7 +234,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
-            pendingUpdate: false,
         };
         this.panels.set(key, ps);
         this.setupWebview(key);
@@ -316,7 +311,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             initialized: false,
             scrollSyncEnabled: false,
             previewFocused: false,
-            pendingUpdate: false,
         };
         this.panels.set(key, ps);
         this.autoPanelKey = key;
@@ -385,10 +379,6 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         ps.panel.onDidChangeViewState(
             (e) => {
                 ps.previewFocused = e.webviewPanel.active;
-                // Flush a pending update if the panel just became visible
-                if (e.webviewPanel.visible && ps.pendingUpdate) {
-                    this.updateContent(ps.document);
-                }
             },
             null,
             []
@@ -543,21 +533,27 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
         );
     }
 
+    /**
+     * Update the preview to reflect the current content of the document.
+     * Modeled after VS Code's built-in markdown preview:
+     *   - No visibility gate. `retainContextWhenHidden: true` keeps hidden
+     *     webviews alive and postMessage delivery works regardless of
+     *     which tab is in front.
+     *   - No pendingUpdate bookkeeping.
+     *   - First call for a panel writes the whole HTML document.
+     *   - Every subsequent call sends a single postMessage with the new
+     *     body HTML and lets the webview swap `#content.innerHTML`.
+     *
+     * If either the initial HTML write or the postMessage delivery ever
+     * needs a hard reset, the user has the Refresh button which does a
+     * full panel dispose+recreate.
+     */
     async updateContent(document: vscode.TextDocument): Promise<void> {
         const ps = this.panels.get(document.fileName);
         if (!ps) return;
 
         ps.document = document;
         ps.panel.title = `Preview: ${path.basename(document.fileName)}`;
-
-        // If the panel is hidden (another tab is in front), VS Code drops
-        // postMessage and may suspend the webview. Mark a pending update
-        // and let onDidChangeViewState flush it when the user comes back.
-        if (!ps.panel.visible) {
-            ps.pendingUpdate = true;
-            return;
-        }
-        ps.pendingUpdate = false;
 
         if (!ps.initialized) {
             const html = this.generateHtml(ps, document.getText(), document.fileName);
@@ -566,17 +562,8 @@ export class MarkdownPreviewProvider implements vscode.WebviewPanelSerializer {
             return;
         }
 
-        // Try incremental update via postMessage; if it fails (webview not
-        // ready or message dropped), fall back to a full re-render so the
-        // preview never goes stale
         const htmlContent = this.renderMarkdown(ps.panel.webview, document.getText(), document.fileName);
-        const delivered = await ps.panel.webview.postMessage({ type: 'updateContent', html: htmlContent });
-        if (!delivered) {
-            ps.initialized = false;
-            const html = this.generateHtml(ps, document.getText(), document.fileName);
-            ps.panel.webview.html = html;
-            ps.initialized = true;
-        }
+        ps.panel.webview.postMessage({ type: 'updateContent', html: htmlContent });
     }
 
     updateTheme(theme: string): void {
